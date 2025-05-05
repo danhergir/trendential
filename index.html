@@ -5,9 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Trendential - Presidential Sentiment</title>
     <link rel="icon" type="image/png" href="img/fav.png">
-    <script src="https://cdn.tailwindcss.com"></script> 
-    <link rel="stylesheet" href="css/style.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="css/style.css"> <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
@@ -18,6 +17,7 @@
     <script>
         dayjs.extend(dayjs_plugin_utc);
         dayjs.extend(dayjs_plugin_timezone);
+        // Example: Set default timezone if needed
         // dayjs.tz.setDefault("America/Bogota");
     </script>
     <style>
@@ -35,7 +35,7 @@
             100% { transform: rotate(360deg); }
         }
 
-        /* Base body styles (Dark theme applied directly) */
+        /* Base body styles */
         body {
             font-family: 'Inter', sans-serif;
             background-color: #0f172a; /* slate-900 */
@@ -43,24 +43,16 @@
         }
 
         /* Custom focus ring color */
-        select:focus, button:focus {
+        input[type="text"]:focus, button:focus {
             outline: 2px solid transparent;
             outline-offset: 2px;
             --tw-ring-color: #6366f1; /* Indigo-500 */
             box-shadow: 0 0 0 2px var(--tw-ring-color);
+            border-color: #6366f1; /* Also change border color on focus */
         }
 
-        /* Style the select dropdown arrow (Dark theme version applied directly) */
-        select {
-            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2394a3b8' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e"); /* slate-400 */
-            background-position: right 0.5rem center;
-            background-repeat: no-repeat;
-            background-size: 1.5em 1.5em;
-            padding-right: 2.5rem;
-            -webkit-appearance: none;
-            -moz-appearance: none;
-            appearance: none;
-        }
+        /* Style the select dropdown arrow (REMOVED as select is replaced) */
+        /* select { ... } */
 
         /* Subtle gradient text for the brand name */
         .trendential-gradient {
@@ -76,21 +68,22 @@
             background-color: #1e293b; /* slate-800 */
         }
 
-        /* --- Style for individual news cards (ADDED) --- */
-        /* Apply classes like 'news-card' in your JS when creating news items */
+        /* --- Style for individual news cards --- */
         .news-card {
-            background-color: white !important; /* White background */
-            color: #1e293b !important; /* Dark text (e.g., slate-800) */
-            /* Add padding, margin, border-radius etc. as needed via Tailwind or here */
-            /* Example using Tailwind classes you'd add in JS: */
-            /* class="news-card bg-white text-slate-800 p-4 rounded-lg shadow mb-4" */
+            background-color: #f8fafc !important; /* slate-50 */
+            color: #1e293b !important; /* slate-800 */
+            /* Added via Tailwind classes in JS */
         }
-        /* Ensure no background change on hover for news cards */
-        .news-card:hover {
-            background-color: white !important; /* Keep background white */
-            /* Add other hover effects if desired (e.g., slight shadow change) */
+        /* Removed hover effect override, Tailwind handles this better */
+
+        /* Style for autocomplete result highlighting */
+        #president-results strong {
+             color: #a5b4fc; /* indigo-300 or choose another highlight color */
         }
-        /* --- End of news card styles --- */
+        /* Style for focused autocomplete item */
+         #president-results > .bg-slate-600 { /* Target the class added by JS */
+              background-color: #475569; /* slate-600 */
+         }
 
     </style>
 </head>
@@ -98,8 +91,7 @@
     <div class="max-w-7xl mx-auto">
         <header class="mb-10 pb-6 border-b border-slate-700">
             <h1 class="text-4xl md:text-5xl font-extrabold text-slate-100 flex items-baseline justify-center md:justify-start">
-                <img src="img/fav.png" alt="Trendential Logo" class="h-12 w-12 mr-3 md:h-14 md:w-14 md:mr-4">
-                <span class="trendential-gradient">Trendential</span>
+                <img src="img/fav.png" alt="Trendential Logo" class="h-12 w-12 mr-3 md:h-14 md:w-14 md:mr-4"> <span class="trendential-gradient">Trendential</span>
             </h1>
             <p class="text-slate-400 mt-2 text-lg text-center md:text-left">
                 Presidential Sentiment Trends
@@ -110,24 +102,45 @@
 
             <section class="lg:col-span-2 bg-gradient-to-br from-slate-800 to-slate-900 p-6 rounded-xl shadow-lg shadow-indigo-900/30 border border-slate-700">
                 <h2 class="text-2xl font-semibold mb-6 text-slate-100">Sentiment Trend Analysis</h2>
-                <div class="mb-6">
-                    <label for="president-select" class="block text-sm font-medium text-slate-300 mb-1">Select President:</label>
-                    <select id="president-select" class="w-full md:w-1/2 p-2.5 border border-slate-600 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ease-in-out bg-slate-700 text-slate-200">
-                        <option value="">Loading Presidents...</option>
-                    </select>
+
+                <div class="mb-6 relative"> <label for="president-search" class="block text-sm font-medium text-slate-300 mb-1">Select President:</label>
+                    <input
+                        type="text"
+                        id="president-search"
+                        placeholder="Loading presidents..."
+                        class="w-full md:w-1/2 p-2.5 border border-slate-600 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ease-in-out bg-slate-700 text-slate-200 placeholder-slate-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                        autocomplete="off" aria-haspopup="listbox"
+                        aria-expanded="false"
+                        aria-controls="president-results"
+                        disabled >
+                    <input type="hidden" id="selected-president-id">
+
+                    <div
+                        id="president-results"
+                        class="absolute z-20 w-full md:w-1/2 mt-1 max-h-60 overflow-y-auto bg-slate-700 border border-slate-600 rounded-lg shadow-lg hidden"
+                        role="listbox"
+                    >
+                        <div id="president-loading" class="p-3 text-slate-400 text-sm hidden">
+                             <div class="flex items-center justify-center space-x-2">
+                                 <div class="loading-spinner !w-5 !h-5 !border-2"></div>
+                                 <span>Loading presidents...</span>
+                            </div>
+                        </div>
+                        <div id="president-no-results" class="p-3 text-slate-400 text-sm hidden">No matching presidents found.</div>
+                    </div>
                 </div>
                 <div class="relative h-96 md:h-[500px]">
                     <div id="chart-loading" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-800/80 backdrop-blur-sm z-10 rounded-lg">
                         <div class="loading-spinner mb-4"></div>
                         <p class="text-slate-400">Loading chart data...</p>
                     </div>
-                    <canvas id="sentimentChart"></canvas> <div id="chart-error" class="absolute inset-0 flex items-center justify-center bg-red-900/50 text-red-300 p-4 rounded-lg hidden z-10">
+                    <canvas id="sentimentChart" class="rounded-lg"></canvas> <div id="chart-error" class="absolute inset-0 flex items-center justify-center bg-red-900/50 text-red-300 p-4 rounded-lg hidden z-10">
                         <i class="fas fa-exclamation-triangle mr-2"></i>
                         <span id="chart-error-message"></span>
                     </div>
-                    <div id="chart-no-data" class="absolute inset-0 flex items-center justify-center bg-slate-700/60 text-slate-400 p-4 rounded-lg hidden z-10">
-                        <i class="fas fa-info-circle mr-2"></i>
-                        <span>No sentiment data available for this president.</span>
+                    <div id="chart-no-data" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-700/60 text-slate-400 p-4 rounded-lg hidden z-10">
+                         <i class="fas fa-chart-line fa-2x mb-2 text-slate-500"></i>
+                         <span id="chart-no-data-message">Please select a president to view the sentiment trend.</span>
                     </div>
                 </div>
             </section>
@@ -144,18 +157,17 @@
                     </button>
                 </div>
 
-                <div id="news-list" class="space-y-4 overflow-y-auto flex-grow h-96 md:h-[500px]">
-                    <div id="news-loading" class="flex flex-col items-center justify-center h-full pt-10">
+                <div id="news-list" class="space-y-4 overflow-y-auto flex-grow h-96 md:h-[500px] p-1"> <div id="news-loading" class="flex flex-col items-center justify-center h-full pt-10">
                         <div class="loading-spinner mb-4"></div>
                         <p class="text-slate-400">Loading news...</p>
                     </div>
                     <p id="no-news-message" class="text-center text-slate-400 pt-10 hidden">
                         <i class="fas fa-newspaper fa-2x mb-2 text-slate-500"></i><br>
-                        No news articles found for this date.
+                        <span id="no-news-text">No news articles found for this date.</span>
                     </p>
                     <p id="news-error-message" class="text-center text-red-400 pt-10 hidden">
                         <i class="fas fa-exclamation-circle fa-2x mb-2 text-red-500"></i><br>
-                        Error loading news articles.
+                        <span id="news-err-text">Error loading news articles.</span>
                     </p>
                     </div>
             </section>
@@ -178,17 +190,21 @@
                     Sentiment is classified on a scale from 0 (Very Negative) to 4 (Very Positive).
                 </li>
                 <li>
-                    The monthly average of these individual article scores is calculated and plotted on the chart to illustrate sentiment trends over time, reflecting media portrayal based on events and decisions during the administration.
+                    The daily average of these individual article scores is calculated and plotted on the chart to illustrate sentiment trends over time, reflecting media portrayal based on events and decisions during the administration.
                 </li>
             </ol>
         </section>
 
         <footer class="mt-12 pt-6 text-center text-slate-400 text-sm border-t border-slate-700">
-            <p>&copy; 2025 Trendential. Data sourced from Supabase. Made by <a class="text-indigo-400 hover:text-indigo-300 hover:underline" href="https://danhergir.github.io" target="_blank">Daniel Hernandez</a></p>
+            <p>&copy; <span id="footer-year">2025</span> Trendential. Data sourced from Supabase. Made by <a class="text-indigo-400 hover:text-indigo-300 hover:underline" href="https://danhergir.github.io" target="_blank">Daniel Hernandez</a></p>
         </footer>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="js/script.js"></script>
+    <script>
+        // Dynamically set footer year
+        document.getElementById('footer-year').textContent = new Date().getFullYear();
+    </script>
 </body>
 </html>
