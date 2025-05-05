@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trendential - Presidential Sentiment Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="icon" type="image/png" href="img/favicon.png">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"> <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/dayjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/plugin/utc.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/plugin/timezone.js"></script>
+    <script>
+        // Extend Day.js with plugins
+        dayjs.extend(dayjs_plugin_utc);
+        dayjs.extend(dayjs_plugin_timezone);
+        // Optional: Set default timezone if needed, otherwise uses browser default
+        // dayjs.tz.setDefault("America/Bogota"); // Example for Bogotá
+    </script>
+    <style>
+        /* Basic style for loading spinner */
+        .loading-spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: #4f46e5; /* Indigo */
+            animation: spin 1s ease infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        /* Base body styles */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc; /* slate-50 */
+        }
+        /* Custom focus ring color for accessibility */
+        select:focus, button:focus {
+             outline: 2px solid transparent;
+             outline-offset: 2px;
+             --tw-ring-color: #6366f1; /* Indigo-500 */
+             box-shadow: 0 0 0 2px var(--tw-ring-color);
+        }
+        /* Style the select dropdown arrow */
+        select {
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+            background-position: right 0.5rem center;
+            background-repeat: no-repeat;
+            background-size: 1.5em 1.5em;
+            padding-right: 2.5rem;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+        }
+        /* Subtle gradient text for the brand name */
+        .trendential-gradient {
+            background: linear-gradient(to right, #4f46e5, #7c3aed); /* Indigo to Purple */
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        /* Ensure chart canvas is responsive within its container */
+        #sentimentChart {
+             max-height: 500px; /* Match container height */
+        }
+    </style>
+</head>
+<body class="text-slate-800 p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto">
+        <header class="mb-10 pb-6 border-b border-slate-200">
+            <h1 class="text-4xl md:text-5xl font-extrabold text-slate-900">
+                <span class="trendential-gradient">Trendential</span>
+            </h1>
+            <p class="text-slate-500 mt-2 text-lg">Presidential Sentiment Trends</p>
+        </header>
+
+        <main class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+            <section class="lg:col-span-2 bg-gradient-to-br from-white to-slate-50 p-6 rounded-xl shadow-lg border border-slate-200">
+                <h2 class="text-2xl font-semibold mb-6 text-slate-800">Sentiment Trend Analysis</h2>
+                <div class="mb-6">
+                    <label for="president-select" class="block text-sm font-medium text-slate-700 mb-1">Select President:</label>
+                    <select id="president-select" class="w-full md:w-1/2 p-2.5 border border-slate-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ease-in-out bg-white">
+                        <option value="">Loading Presidents...</option>
+                    </select>
+                </div>
+                <div class="relative h-96 md:h-[500px]">
+                     <div id="chart-loading" class="absolute inset-0 flex flex-col items-center justify-center bg-white/80 backdrop-blur-sm z-10 rounded-lg">
+                        <div class="loading-spinner mb-4"></div>
+                        <p class="text-slate-600">Loading chart data...</p>
+                    </div>
+                    <canvas id="sentimentChart"></canvas>
+                     <div id="chart-error" class="absolute inset-0 flex items-center justify-center bg-red-50 text-red-700 p-4 rounded-lg hidden z-10">
+                        <i class="fas fa-exclamation-triangle mr-2"></i>
+                        <span id="chart-error-message"></span>
+                    </div>
+                     <div id="chart-no-data" class="absolute inset-0 flex items-center justify-center bg-slate-50 text-slate-500 p-4 rounded-lg hidden z-10">
+                        <i class="fas fa-info-circle mr-2"></i>
+                        <span>No sentiment data available for this president.</span>
+                    </div>
+                </div>
+            </section>
+
+            <section class="lg:col-span-1 bg-white p-6 rounded-xl shadow-md border border-slate-200 flex flex-col">
+                <h2 class="text-xl font-semibold mb-5 text-slate-800">Daily News Feed</h2>
+                <div class="flex justify-between items-center mb-5 pb-4 border-b border-slate-200">
+                    <button id="prev-day" class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg shadow-sm hover:bg-indigo-700 transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                        <i class="fas fa-arrow-left mr-1"></i> Prev
+                    </button>
+                    <span id="current-date" class="text-base font-medium text-slate-700 whitespace-nowrap">Loading...</span>
+                     <button id="next-day" class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg shadow-sm hover:bg-indigo-700 transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                         Next <i class="fas fa-arrow-right ml-1"></i>
+                     </button>
+                </div>
+
+                <div id="news-list" class="space-y-4 overflow-y-auto flex-grow h-96 md:h-[500px]">
+                    <div id="news-loading" class="flex flex-col items-center justify-center h-full pt-10">
+                         <div class="loading-spinner mb-4"></div>
+                         <p class="text-slate-600">Loading news...</p>
+                    </div>
+                     <p id="no-news-message" class="text-center text-slate-500 pt-10 hidden">
+                        <i class="fas fa-newspaper fa-2x mb-2 text-slate-400"></i><br>
+                        No news articles found for this date.
+                    </p>
+                     <p id="news-error-message" class="text-center text-red-600 pt-10 hidden">
+                        <i class="fas fa-exclamation-circle fa-2x mb-2 text-red-400"></i><br>
+                        Error loading news articles.
+                     </p>
+                    </div>
+            </section>
+        </main>
+
+        <footer class="mt-12 pt-6 text-center text-slate-500 text-sm border-t border-slate-200">
+             <p>&copy; 2025 Trendential. Data sourced from Supabase. Made by <a class="text-indigo-600 hover:text-indigo-800 hover:underline" href="https://danhergir.github.io" target="_blank">Daniel Hernandez</a></p>
+        </footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/script.js"></script>
+</body>
+</html>

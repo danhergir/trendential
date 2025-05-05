@@ -1,0 +1,25 @@
+/* css/style.css */
+
+/* Add any custom styles here if Tailwind classes aren't sufficient */
+/* For example, more complex animations or very specific overrides. */
+
+/* Example: Custom scrollbar styles for the news feed (optional) */
+/* Apply this to the #news-list element if desired */
+/* #news-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+#news-list::-webkit-scrollbar-track {
+    background: #f1f5f9; // slate-100
+    border-radius: 10px;
+}
+
+#news-list::-webkit-scrollbar-thumb {
+    background: #94a3b8; // slate-400
+    border-radius: 10px;
+}
+
+#news-list::-webkit-scrollbar-thumb:hover {
+    background: #64748b; // slate-500
+} */
+
