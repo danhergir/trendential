@@ -72,7 +72,7 @@ async function fetchPresidents() {
     try {
         const { data: presidents, error } = await supabaseClient
             .from('presidents')
-            .select('id, name, last_name')
+            .select('*')
             .order('name', { ascending: true });
 
         if (error) throw error; // Throw error to be caught below
@@ -164,13 +164,11 @@ async function fetchSentimentData(presidentId) {
 /**
  * Fetches news articles for the currently selected date, joining with president info.
  */
-async function fetchNewsForDate() {
-    const localDateStr = currentDate.format('YYYY-MM-DD'); // For logging
-    console.log(`--- Fetching news for local date: ${localDateStr} ---`);
+async function fetchNewsForDate(presidentId) {
+    if (!supabaseClient || !presidentId) return;
 
     showNewsLoading();
     currentDateSpan.textContent = currentDate.format('MMMM D, YYYY');
-    // updatePaginationButtons called separately after selection change
 
     try {
         const startOfDay = currentDate.startOf('day').format('YYYY-MM-DD');
@@ -181,15 +179,10 @@ async function fetchNewsForDate() {
             .select('*, presidents ( id, name, last_name )')
             .gte('date', startOfDay)
             .lte('date', endOfDay)
+            .eq('president_id', presidentId)
             .order('date', { ascending: false });
 
         if (error) throw error; // Throw error to be caught below
-
-        console.log(`News items returned for ${localDateStr}:`, newsItems.length);
-
-        if (newsItems.length > 0) {
-            console.log("Dates of returned news items (ISO):", newsItems.map(item => item.date));
-        }
 
         displayNewsItems(newsItems);
 
@@ -325,38 +318,79 @@ function displayNewsItems(newsItems) {
  */
 function createNewsElement(newsItem, presidentName) {
     const div = document.createElement('div');
-    div.className = 'p-4 border border-slate-200 rounded-lg bg-slate-50/50 hover:bg-slate-100 transition duration-150 ease-in-out';
+    // Added overflow-hidden just in case content is extremely long, adjust if needed
+    div.className = 'p-4 border border-slate-200 rounded-lg bg-slate-100 transition duration-150 ease-in-out overflow-hidden';
 
-    let sentimentColor = 'text-slate-600';
-    let sentimentIcon = 'fa-meh';
-    const score = newsItem.sentiment_score;
+    // --- Sentiment Calculation ---
+    let sentimentColor = 'text-slate-600'; // Default: Neutral
+    let sentimentIcon = 'fa-meh';       // Default: Neutral icon
+    let sentimentLabel = 'Neutral';     // Default: Descriptive label
 
-    if (typeof score === 'number') {
-        if (score > 0.2) {
-            sentimentColor = 'text-green-600'; sentimentIcon = 'fa-smile';
-        } else if (score < -0.2) {
-            sentimentColor = 'text-red-600'; sentimentIcon = 'fa-frown';
+    const score = newsItem.sentiment_score; // This is the float score (0.0 to 4.0)
+
+    // Check if score is a valid number
+    if (typeof score === 'number' && !isNaN(score)) {
+        // Define thresholds to map the float score back to categories
+        // Centered around integer values (0.5, 1.5, 2.5, 3.5)
+        if (score < 0.5) {          // Closest to 0 (Very Negative)
+            sentimentColor = 'text-red-800 dark:text-red-400'; // Added dark mode example
+            sentimentIcon = 'fa-angry';
+            sentimentLabel = 'Very Negative';
+        } else if (score < 1.5) {   // Closest to 1 (Negative)
+            sentimentColor = 'text-red-600 dark:text-red-500';
+            sentimentIcon = 'fa-frown';
+            sentimentLabel = 'Negative';
+        } else if (score < 2.5) {   // Closest to 2 (Neutral)
+            sentimentColor = 'text-slate-600 dark:text-slate-400';
+            sentimentIcon = 'fa-meh';
+            sentimentLabel = 'Neutral';
+        } else if (score < 3.5) {   // Closest to 3 (Positive)
+            sentimentColor = 'text-green-600 dark:text-green-400';
+            sentimentIcon = 'fa-smile';
+            sentimentLabel = 'Positive';
+        } else {                    // Closest to 4 (Very Positive) (score >= 3.5)
+            sentimentColor = 'text-green-800 dark:text-green-300';
+            sentimentIcon = 'fa-laugh';
+            sentimentLabel = 'Very Positive';
         }
+    } else {
+        // Handle cases where score is missing or not a number
+        sentimentColor = 'text-gray-400 dark:text-gray-500';
+        sentimentIcon = 'fa-question-circle';
+        sentimentLabel = 'Score unavailable';
     }
+    // --- End Sentiment Calculation ---
 
+    // Format other data
     const formattedScore = typeof score === 'number' ? score.toFixed(2) : 'N/A';
+    // Use current date/time information for relative formatting if desired, else stick to YYYY-MM-DD
     const formattedDate = newsItem.date ? dayjs(newsItem.date).format('YYYY-MM-DD') : 'N/A';
+    // Example using time zone and locale (optional, requires plugins)
+    // const formattedDate = newsItem.date ? dayjs(newsItem.date).tz('America/Bogota').locale('es').format('D MMM YYYY') : 'N/A';
 
-    const summaryOrLink = newsItem.url ? `<a href="${newsItem.url}" target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:text-indigo-800 hover:underline break-words">${newsItem.url}</a>` : 'No URL available.';
-    const title = newsItem.title || 'No Title Provided';
 
+    const summaryOrLink = newsItem.url
+        ? `<a href="${newsItem.url}" target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 hover:underline break-words">${newsItem.url}</a>`
+        : 'No URL available.';
+    const title = newsItem.title || 'No Title Provided'; // Use provided title or fallback
+
+    // Set the innerHTML using the calculated sentiment variables and other data
+    // Added title attribute to the sentiment span for hover info
+    // Added aria-hidden="true" to decorative icons
     div.innerHTML = `
-        <h3 class="text-base font-semibold text-slate-800 mb-1">${title}</h3>
-        <div class="text-xs text-slate-500 mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span><i class="far fa-calendar-alt mr-1 opacity-80"></i>${formattedDate}</span>
-            <span><i class="far fa-user mr-1 opacity-80"></i>${presidentName}</span>
-            <span class="font-medium ${sentimentColor} flex items-center">
-                <i class="fas ${sentimentIcon} mr-1.5"></i>${formattedScore} </span>
+        <h3 class="text-base font-semibold text-slate-800 text-slate-100 mb-1 break-words">${title}</h3>
+        <div class="text-xs text-slate-500 dark:text-slate-400 mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span><i class="far fa-calendar-alt mr-1 opacity-80" aria-hidden="true"></i>${formattedDate}</span>
+            <span><i class="far fa-user mr-1 opacity-80" aria-hidden="true"></i>${presidentName || 'N/A'}</span>
+            <span class="font-medium ${sentimentColor} flex items-center" title="Sentiment: ${sentimentLabel}">
+                <i class="fas ${sentimentIcon} mr-1.5" aria-hidden="true"></i>${formattedScore}
+            </span>
         </div>
-        <p class="text-sm text-slate-600">${summaryOrLink}</p>
+        <p class="text-sm text-slate-600 dark:text-slate-300">${summaryOrLink}</p>
     `;
     return div;
 }
+
 
 
 // --- UI State Management ---
@@ -460,8 +494,7 @@ presidentSelect.addEventListener('change', (event) => {
 
     if (presidentIsSelected) {
         fetchSentimentData(currentPresidentId);
-        // Optional: Fetch news immediately when president changes, if desired
-        // fetchNewsForDate();
+        fetchNewsForDate(currentPresidentId);
     } else {
         // Clear chart if "Select President" is chosen
         if (sentimentChart) {
@@ -469,11 +502,10 @@ presidentSelect.addEventListener('change', (event) => {
             sentimentChart = null;
         }
         showChartMessage('Please select a president to view the sentiment trend.');
-        // Optional: Clear news list if desired when no president is selected
-        // newsList.innerHTML = '';
-        // hideNewsMessages();
-        // noNewsMessage.classList.remove('hidden'); // Show 'no news' or a different message
-        // noNewsMessage.textContent = "Select a president to view news.";
+        newsList.innerHTML = '';
+        hideNewsMessages();
+        noNewsMessage.classList.remove('hidden');
+        noNewsMessage.textContent = "Select a president to view news.";
     }
 });
 
@@ -481,7 +513,7 @@ prevDayButton.addEventListener('click', () => {
     // Double check disabled state just in case
     if (prevDayButton.disabled || !currentDate) return;
     currentDate = currentDate.subtract(1, 'day');
-    fetchNewsForDate();
+    fetchNewsForDate(currentPresidentId);
     updatePaginationButtons(true); // Re-check next button state
 });
 
@@ -489,26 +521,20 @@ nextDayButton.addEventListener('click', () => {
     // Double check disabled state just in case
     if (nextDayButton.disabled || !currentDate) return;
     currentDate = currentDate.add(1, 'day');
-    fetchNewsForDate();
+    fetchNewsForDate(currentPresidentId);
     updatePaginationButtons(true); // Re-check next button state
 });
 
 // --- Initial Load ---
 
 document.addEventListener('DOMContentLoaded', () => {
-    if (typeof dayjs === 'undefined') {
-        console.error("Day.js library not loaded!");
-        alert("Error: Day.js library failed to load.");
-        disableUIOnError('Day.js Load Failed');
-        return;
-    }
     // Now it's safe to initialize currentDate
     currentDate = dayjs().startOf('day');
     currentDateSpan.textContent = currentDate.format('MMMM D, YYYY'); // Set initial date display
 
     if (initializeSupabase()) {
         fetchPresidents(); // Load presidents dropdown
-        fetchNewsForDate(); // Fetch news for the initial date (today) - will only run if currentDate is set
+        // fetchNewsForDate(); // Fetch news for the initial date (today) - will only run if currentDate is set
         showChartMessage('Please select a president to view the sentiment trend.');
         // Initial button state: disabled as no president is selected yet
         updatePaginationButtons(false);
