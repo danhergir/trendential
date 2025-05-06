@@ -46,13 +46,17 @@ function initializeSupabase() {
         if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
              throw new Error("Supabase URL or Key is missing.");
         }
+        // Make sure Supabase and Day.js are loaded
+        if (typeof supabase === 'undefined' || typeof dayjs === 'undefined') {
+             throw new Error("Required libraries (Supabase, Day.js) not loaded. Check script tags.");
+        }
         supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         console.log("Supabase client initialized successfully.");
         return true;
     } catch (error) {
         console.error("Error initializing Supabase client:", error);
-        alert(`Failed to initialize Supabase: ${error.message}. Check console and config.`);
-        disableUIOnError('Supabase Init Failed');
+        alert(`Failed to initialize: ${error.message}. Check console and script setup.`);
+        disableUIOnError('Initialization Failed');
         return false;
     }
 }
@@ -218,6 +222,7 @@ async function fetchNewsForDate(presidentId) {
 
     try {
         // Use ISO strings which Supabase typically handles well for timestamp[tz]
+        // IMPORTANT: Ensure 'currentDate' is a Day.js object
         const startOfDay = currentDate.startOf('day').toISOString();
         const endOfDay = currentDate.endOf('day').toISOString();
 
@@ -279,8 +284,8 @@ function renderSentimentChart(labels, scores) {
                 backgroundColor: gradient,
                 tension: 0.3,
                 fill: true,
-                pointRadius: 3,
-                pointHoverRadius: 6,
+                pointRadius: 4, // Slightly larger points for easier clicking
+                pointHoverRadius: 7, // Larger hover effect
                 pointBackgroundColor: 'rgb(124, 58, 237)',
                 borderWidth: 2,
             }]
@@ -290,26 +295,23 @@ function renderSentimentChart(labels, scores) {
             maintainAspectRatio: false,
             scales: {
                 y: {
-                    beginAtZero: false, // Scores might hover around neutral
-                    // Suggest min/max based on your scale (0-4) if data range is small
-                    // suggestedMin: 0,
-                    // suggestedMax: 4.5,
+                    // --- MODIFICATION: Set fixed Y-axis range ---
+                    min: 0,
+                    max: 4,
+                    // --- End Modification ---
                     title: {
                         display: true,
-                        text: 'Avg. Sentiment Score',
+                        text: 'Sentiment Score', // Updated label
                         font: { size: 14, weight: '500' },
                         color: '#94a3b8' // slate-400
                     },
                     grid: { color: 'rgba(51, 65, 85, 0.7)' }, // slate-700 with opacity
-                    ticks: { color: '#94a3b8' } // slate-400
+                    ticks: {
+                        color: '#94a3b8', // slate-400
+                        stepSize: 1 // Show ticks for each integer score
+                    }
                 },
                 x: {
-                    // Consider using a time scale if dates are numerous
-                    // Requires chartjs-adapter-dayjs:
-                    // import dayjs from 'dayjs';
-                    // import 'chartjs-adapter-dayjs'; (Need to bundle or use CDN)
-                    // type: 'time',
-                    // time: { unit: 'day' },
                     title: {
                         display: true,
                         text: 'Date',
@@ -338,6 +340,11 @@ function renderSentimentChart(labels, scores) {
                     titleColor: '#e2e8f0', // slate-200
                     bodyColor: '#cbd5e1', // slate-300
                     callbacks: {
+                        title: function(tooltipItems) {
+                             // Format title date using Day.js for better readability
+                             const dateStr = tooltipItems[0]?.label;
+                             return dateStr ? dayjs.utc(dateStr).format('MMMM D, YYYY') : '';
+                         },
                         label: function(context) {
                             let label = context.dataset.label || '';
                             if (label) { label += ': '; }
@@ -355,7 +362,52 @@ function renderSentimentChart(labels, scores) {
                     labels: { color: '#94a3b8' } // slate-400
                 }
             },
-            hover: { mode: 'nearest', intersect: false },
+            // --- MODIFICATION: Add onClick handler ---
+            onClick: (event, elements, chart) => {
+                if (!elements || elements.length === 0) {
+                    console.log("Chart background clicked.");
+                    return; // No datapoint clicked
+                }
+                const firstElement = elements[0]; // Get the first clicked element
+                const index = firstElement.index;
+                const clickedDateString = chart.data.labels[index]; // Get date string (YYYY-MM-DD)
+
+                if (!clickedDateString) {
+                     console.warn("Could not get date from clicked chart point.");
+                     return;
+                }
+
+                // Parse the date string using Day.js (use UTC since aggregation likely used UTC)
+                const clickedDate = dayjs.utc(clickedDateString);
+
+                if (!clickedDate.isValid()) {
+                    console.error("Invalid date parsed from chart label:", clickedDateString);
+                    return;
+                }
+
+                console.log(`Chart point clicked. Date: ${clickedDate.format('YYYY-MM-DD')}`);
+
+                // Update global state and fetch news
+                currentDate = clickedDate; // Update the global current date object
+
+                const presidentId = selectedPresidentIdInput.value;
+                if (presidentId) {
+                    console.log(`Fetching news for president ${presidentId} on ${currentDate.format('YYYY-MM-DD')}`);
+                    fetchNewsForDate(presidentId); // Fetch news for the clicked date
+                    updatePaginationButtons(true); // Update button states
+                    // Update the date display span to reflect the clicked date
+                    currentDateSpan.textContent = currentDate.format('MMMM D, YYYY');
+                } else {
+                    console.log("No president selected, cannot fetch news for clicked date.");
+                    // Optionally show a message in the news section
+                    showNewsError("Please select a president to view news for the selected date.");
+                }
+            },
+            // --- End Modification ---
+            hover: {
+                mode: 'nearest', // Find the nearest item
+                intersect: false // Hover works even if not directly over the point
+            },
             animation: { duration: 600, easing: 'easeOutCubic' }
         }
     });
@@ -389,61 +441,47 @@ function displayNewsItems(newsItems) {
     }
 }
 
-/**
- * Creates an HTML element for a single news item.
- */
 function createNewsElement(newsItem, presidentName) {
     const div = document.createElement('div');
-    // Use Tailwind classes directly for styling the card
-    div.className = 'news-card p-4 border border-slate-200 rounded-lg bg-slate-100 transition duration-150 ease-in-out overflow-hidden shadow'; // Added shadow
+    div.className = 'news-card p-4 border border-slate-200 rounded-lg bg-slate-100 transition duration-150 ease-in-out overflow-hidden shadow';
 
-    // --- Sentiment Calculation ---
-    let sentimentColor = 'text-slate-600'; // Neutral
-    let sentimentIcon = 'fa-meh';          // Neutral
-    let sentimentLabel = 'Neutral';
+    // --- REVISED Sentiment Calculation ---
+    let sentimentColor = 'text-gray-500';
+    let sentimentIcon = 'fa-question-circle';
+    let sentimentLabel = 'Score unavailable';
 
     const score = newsItem.sentiment_score;
 
-    if (typeof score === 'number' && !isNaN(score)) {
-        // Mapping float score (0.0 to 4.0) back to categories
-        if (score < 0.5) {         // ~0: Very Negative
-            sentimentColor = 'text-red-700'; // Darker red for contrast on light bg
-            sentimentIcon = 'fa-angry';
-            sentimentLabel = 'Very Negative';
-        } else if (score < 1.5) {  // ~1: Negative
-            sentimentColor = 'text-red-600';
-            sentimentIcon = 'fa-frown';
-            sentimentLabel = 'Negative';
-        } else if (score < 2.5) {  // ~2: Neutral
-            sentimentColor = 'text-slate-600';
-            sentimentIcon = 'fa-meh';
-            sentimentLabel = 'Neutral';
-        } else if (score < 3.5) {  // ~3: Positive
-            sentimentColor = 'text-green-600';
-            sentimentIcon = 'fa-smile';
-            sentimentLabel = 'Positive';
-        } else {                   // ~4: Very Positive
-            sentimentColor = 'text-green-700'; // Darker green
-            sentimentIcon = 'fa-laugh';
-            sentimentLabel = 'Very Positive';
-        }
-    } else { // Handle missing/invalid score
-        sentimentColor = 'text-gray-400';
-        sentimentIcon = 'fa-question-circle';
-        sentimentLabel = 'Score unavailable';
+    if (score < 0.75) {          // Very Negative
+        sentimentColor = 'text-red-700';
+        sentimentIcon = 'fa-angry';
+        sentimentLabel = 'Very Negative';
+    } else if (score < 1.75) {   // Negative
+        sentimentColor = 'text-orange-500';
+        sentimentIcon = 'fa-frown-open';
+        sentimentLabel = 'Negative';
+    } else if (score < 2.25) {   // Neutral
+        sentimentColor = 'text-gray-500';
+        sentimentIcon = 'fa-meh';
+        sentimentLabel = 'Neutral';
+    } else if (score < 3.25) {   // Positive
+        sentimentColor = 'text-emerald-600';
+        sentimentIcon = 'fa-smile';
+        sentimentLabel = 'Positive';
+    } else {                    // Very Positive
+        sentimentColor = 'text-green-500';
+        sentimentIcon = 'fa-laugh-beam';
+        sentimentLabel = 'Very Positive';
     }
-    // --- End Sentiment Calculation ---
-
+    
     const formattedScore = typeof score === 'number' ? score.toFixed(2) : 'N/A';
-    // Format date using Day.js - show time if available, otherwise just date
-    // Assumes 'date' field might be a timestamp or just a date string
     const formattedDate = newsItem.date
-        ? dayjs(newsItem.date).format('YYYY-MM-DD HH:mm') // Adjust format as needed
+        ? dayjs(newsItem.date).format('YYYY-MM-DD')
         : 'N/A';
 
     const summaryOrLink = newsItem.url
         ? `<a href="${newsItem.url}" target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:text-indigo-800 hover:underline break-words">${newsItem.url}</a>`
-        : '<span class="text-slate-500">No URL available.</span>'; // Style non-link text
+        : '<span class="text-slate-500">No URL available.</span>';
 
     const title = newsItem.title || 'No Title Provided';
 
@@ -460,9 +498,6 @@ function createNewsElement(newsItem, presidentName) {
     `;
     return div;
 }
-
-
-// --- Autocomplete UI ---
 
 function showPresidentLoading() {
     presidentLoadingIndicator.classList.remove('hidden');
@@ -575,6 +610,11 @@ function selectPresident(id, name) {
     const presidentIsSelected = true;
     updatePaginationButtons(presidentIsSelected);
 
+    // Set currentDate to today when a NEW president is selected
+    // This prevents keeping an old date from a previous selection or chart click
+    currentDate = dayjs().startOf('day');
+    currentDateSpan.textContent = currentDate.format('MMMM D, YYYY');
+
     // Trigger data fetching only if ID is valid
     fetchSentimentData(id);
     fetchNewsForDate(id);
@@ -601,6 +641,10 @@ function clearPresidentSelection() {
      hideNewsMessages();
      noNewsMessage.classList.remove('hidden');
      noNewsText.textContent = "Select a president to view news.";
+
+     // Reset date to today and update display
+     currentDate = dayjs().startOf('day');
+     currentDateSpan.textContent = currentDate.format('MMMM D, YYYY');
 
      // Disable pagination
      updatePaginationButtons(false);
@@ -675,9 +719,12 @@ function hideNewsMessages() {
 function updatePaginationButtons(isPresidentSelected) {
     prevDayButton.disabled = !isPresidentSelected;
 
+    // Ensure currentDate is a valid Day.js object before comparison
     const today = dayjs().startOf('day');
+    let isCurrentDateValid = currentDate && typeof currentDate.isSame === 'function';
+
     // Disable next if no president selected OR if current date is today or later
-    const isNextDisabled = !isPresidentSelected || (currentDate && (currentDate.isSame(today, 'day') || currentDate.isAfter(today)));
+    const isNextDisabled = !isPresidentSelected || (isCurrentDateValid && (currentDate.isSame(today, 'day') || currentDate.isAfter(today)));
     nextDayButton.disabled = isNextDisabled;
 
     // Toggle Tailwind classes for visual state
@@ -773,7 +820,8 @@ document.addEventListener('click', (event) => {
 // News Pagination Listeners
 prevDayButton.addEventListener('click', () => {
     const currentPresidentId = selectedPresidentIdInput.value;
-    if (prevDayButton.disabled || !currentDate || !currentPresidentId) return;
+    // Ensure currentDate is valid Day.js object before manipulation
+    if (prevDayButton.disabled || !(currentDate instanceof dayjs) || !currentPresidentId) return;
     currentDate = currentDate.subtract(1, 'day');
     fetchNewsForDate(currentPresidentId);
     updatePaginationButtons(!!currentPresidentId); // Re-check buttons state
@@ -781,7 +829,8 @@ prevDayButton.addEventListener('click', () => {
 
 nextDayButton.addEventListener('click', () => {
     const currentPresidentId = selectedPresidentIdInput.value;
-    if (nextDayButton.disabled || !currentDate || !currentPresidentId) return;
+    // Ensure currentDate is valid Day.js object before manipulation
+    if (nextDayButton.disabled || !(currentDate instanceof dayjs) || !currentPresidentId) return;
     currentDate = currentDate.add(1, 'day');
     fetchNewsForDate(currentPresidentId);
     updatePaginationButtons(!!currentPresidentId); // Re-check buttons state
@@ -790,9 +839,16 @@ nextDayButton.addEventListener('click', () => {
 // --- Initial Load ---
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Set initial date
-    currentDate = dayjs().startOf('day'); // Use today as the starting date
-    currentDateSpan.textContent = currentDate.format('MMMM D, YYYY');
+    // Set initial date (check if Day.js is loaded)
+    if (typeof dayjs !== 'undefined') {
+        currentDate = dayjs().startOf('day'); // Use today as the starting date
+        currentDateSpan.textContent = currentDate.format('MMMM D, YYYY');
+    } else {
+        console.error("Day.js library not loaded. Date functionality will be broken.");
+        currentDateSpan.textContent = "Error: Date library missing";
+        // Consider disabling date-related UI or showing a clearer error
+    }
+
 
     if (initializeSupabase()) {
         fetchPresidents(); // Fetch presidents for the autocomplete
